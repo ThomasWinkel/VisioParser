@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>Test_NET48</RootNamespace>
+    <AssemblyName>Test_NET48</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VisioParser\VisioParser.csproj" />
+  </ItemGroup>
+</Project>
