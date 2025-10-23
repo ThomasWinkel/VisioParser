@@ -1,6 +1,6 @@
 # VisioParser
 Extracts Visio object model from vsdx file for further processing or JSON export.  
-No COM Interop, no Visio Installation required.
+No COM Interop, no Visio installation required.
 
 ## Usage
 ### Parse VSDX file and export as JSON
