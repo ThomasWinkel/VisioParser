@@ -47,7 +47,7 @@ namespace Geradeaus.Visio
         public string Name { get; set; }
         public string NameU { get; set; }
         public string NameId { get; set; }
-        public string Master { get; set; }
+        public int? Master { get; set; }
         public string Text { get; set; }
         public Dictionary<string, UserRow> UserRows { get; set; }
         public Dictionary<string, PropRow> PropRows { get; set; }

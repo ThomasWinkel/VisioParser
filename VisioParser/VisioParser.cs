@@ -10,16 +10,13 @@ namespace Geradeaus.Visio
 {
     public class VisioParser
     {
-        public string FullPath { get; }
-        public VisioModel VisioModel { get; internal set; }
-        public VisioParser(string fullPath)
-        {
-            FullPath = fullPath;
-        }
+        public VisioModel VisioModel { get; set; }
 
-        public void Parse()
+        public VisioParser() { }
+
+        public void ParseVsdx(string vsdxPath)
         {
-            using (FileStream fileStream = new FileStream(FullPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (FileStream fileStream = new FileStream(vsdxPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
                 using (Package package = Package.Open(fileStream, FileMode.Open, FileAccess.Read))
                 {
@@ -28,17 +25,30 @@ namespace Geradeaus.Visio
             }
         }
 
-        public void ExportJson(string fullPath)
+        public void ExportJson(string jsonPath)
         {
-            using (StreamWriter file = File.CreateText(fullPath))
+            using (StreamWriter file = File.CreateText(jsonPath))
             {
                 JsonSerializer serializer = new JsonSerializer();
                 serializer.Serialize(file, VisioModel);
             }
         }
 
+        public void ImportJson(string jsonPath)
+        {
+            VisioModel = null;
+
+            using (StreamReader file = File.OpenText(jsonPath))
+            {
+                JsonSerializer serializer = new JsonSerializer();
+                VisioModel = (VisioModel)serializer.Deserialize(file, typeof(VisioModel));
+            }
+        }
+
         private void ParseDocument(Package package)
         {
+            VisioModel = null;
+
             PackagePart documentPart = VsdxTools.GetPackageParts(package, RelationshipTypes.Document).ElementAtOrDefault(0);
             if (documentPart == null) return;
 
@@ -52,7 +62,7 @@ namespace Geradeaus.Visio
             VisioModel.Document.UserRows = VsdxTools.ParseUserSection(documentSheetElement);
             VisioModel.Document.PropRows = VsdxTools.ParsePropertySection(documentSheetElement);
             VisioModel.Document.Masters = VsdxTools.ParseMasters(package, documentPart);
-            VisioModel.Document.Pages = VsdxTools.ParsePages(package, documentPart);
+            VisioModel.Document.Pages = VsdxTools.ParsePages(package, documentPart, VisioModel.Document.Masters);
         }
     }
 }

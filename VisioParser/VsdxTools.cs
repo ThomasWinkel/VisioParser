@@ -51,7 +51,7 @@ namespace Geradeaus.Visio
             };
         }
 
-        public static Dictionary<int, Page> ParsePages(Package package, PackagePart documentPart)
+        public static Dictionary<int, Page> ParsePages(Package package, PackagePart documentPart, Dictionary<int, Master> masters)
         {
             Dictionary<int, Page> pages = new Dictionary<int, Page>();
             PackagePart pagesPart = GetPackageParts(package, documentPart, RelationshipTypes.Pages).ElementAtOrDefault(0);
@@ -67,14 +67,14 @@ namespace Geradeaus.Visio
                 PackageRelationship pageRelationship = pagesPart.GetRelationship(relId);
                 Uri pageUri = PackUriHelper.ResolvePartUri(pagesPart.Uri, pageRelationship.TargetUri);
                 PackagePart pagePart = package.GetPart(pageUri);
-                Page page = ParsePage(pagePart, pageElement);
+                Page page = ParsePage(pagePart, pageElement, masters);
                 pages[page.Id] = page;
             }
 
             return pages;
         }
 
-        public static Page ParsePage(PackagePart pagePart, XElement pageElement)
+        public static Page ParsePage(PackagePart pagePart, XElement pageElement, Dictionary<int, Master> masters)
         {
             Page page = new Page();
             page.Id = int.Parse(pageElement.Attribute("ID")?.Value);
@@ -93,7 +93,7 @@ namespace Geradeaus.Visio
 
             foreach (var shapeElement in shapeElements)
             {
-                Shape shape = ParseShape(shapeElement);
+                Shape shape = ParseShape(shapeElement, masters);
                 page.Shapes[shape.Id] = shape;
             }
 
@@ -102,19 +102,29 @@ namespace Geradeaus.Visio
             return page;
         }
 
-        public static Shape ParseShape(XElement shapeElement)
+        public static Shape ParseShape(XElement shapeElement, Dictionary<int, Master> masters)
         {
-            return new Shape
+            Shape shape = new Shape
             {
                 Id = int.Parse(shapeElement.Attribute("ID")?.Value),
                 Name = shapeElement.Attribute("Name")?.Value,
                 NameU = shapeElement.Attribute("NameU")?.Value,
                 NameId = shapeElement.Attribute("NameID")?.Value,
                 Text = shapeElement.Element(ns + "Text")?.Value,
-                Master = shapeElement.Attribute("Master")?.Value,
-                UserRows = ParseUserSection(shapeElement),
-                PropRows = ParsePropertySection(shapeElement)
+                Master = (int?)shapeElement.Attribute("Master")
             };
+
+            if (masters == null || shape.Master == null || !masters.ContainsKey(shape.Master.Value))
+            {
+                shape.UserRows = ParseUserSection(shapeElement);
+                shape.PropRows = ParsePropertySection(shapeElement);
+                return shape;
+            }
+
+            shape.UserRows = ParseUserSection(shapeElement, masters[shape.Master.Value].UserRows);
+            shape.PropRows = ParsePropertySection(shapeElement, masters[shape.Master.Value].PropRows);
+
+            return shape;
         }
 
         public static List<Connect> ParseConnects(XDocument pageDocument)
@@ -171,7 +181,7 @@ namespace Geradeaus.Visio
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Color")
                             ?.Attribute("V")),
                         ColorTrans = double.Parse((string)row.Elements(ns + "Cell")
-                            .FirstOrDefault(c => (string)c.Attribute("N") == "Color")
+                            .FirstOrDefault(c => (string)c.Attribute("N") == "ColorTrans")
                             ?.Attribute("V"))
                     })
                 ?? new Dictionary<int, Layer>();
@@ -196,6 +206,76 @@ namespace Geradeaus.Visio
                             ?.Attribute("V")
                     })
                 ?? new Dictionary<string, UserRow>();
+        }
+
+        public static Dictionary<string, UserRow> ParseUserSection(XElement element, Dictionary<string, UserRow> masterUserRows)
+        {
+            Dictionary<string, UserRow> userRows;
+
+            if (masterUserRows == null)
+            {
+                userRows = new Dictionary<string, UserRow>();
+            }
+            else
+            {
+                userRows = masterUserRows.ToDictionary(
+                    entry => entry.Key,
+                    entry => new UserRow
+                    {
+                        Value = entry.Value.Value,
+                        Prompt = entry.Value.Prompt
+                    });
+            }
+
+            var rowElements = element?
+                .Elements(ns + "Section")
+                .FirstOrDefault(s => (string)s.Attribute("N") == "User")
+                ?.Elements(ns + "Row");
+
+            if (rowElements == null || !rowElements.Any())
+                return masterUserRows;
+
+            foreach (var rowElement in rowElements)
+            {
+                string rowName = (string)rowElement.Attribute("N");
+
+                if ((string)rowElement.Attribute("Del") == "1")
+                {
+                    if (userRows.ContainsKey(rowName))
+                    {
+                        userRows.Remove(rowName);
+                    }
+                    continue;
+                }
+
+                string value = (string)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
+                    ?.Attribute("V");
+                string prompt = (string)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Prompt")
+                    ?.Attribute("V");
+
+                if (!userRows.ContainsKey(rowName))
+                {
+                    userRows[rowName] = new UserRow
+                    {
+                        Value = value,
+                        Prompt = prompt
+                    };
+                    continue;
+                }
+
+                if (value != null)
+                {
+                    userRows[rowName].Value = value;
+                }
+                if (prompt != null)
+                {
+                    userRows[rowName].Prompt = prompt;
+                }
+            }
+
+            return userRows;
         }
 
         public static Dictionary<string, PropRow> ParsePropertySection(XElement element)
@@ -226,6 +306,88 @@ namespace Geradeaus.Visio
                             ?.Attribute("V")
                     })
                 ?? new Dictionary<string, PropRow>();
+        }
+
+        public static Dictionary<string, PropRow> ParsePropertySection(XElement element, Dictionary<string, PropRow> masterPropRows)
+        {
+            Dictionary<string, PropRow> propRows;
+
+            if (masterPropRows == null)
+            {
+                propRows = new Dictionary<string, PropRow>();
+            }
+            else
+            {
+                propRows = masterPropRows.ToDictionary(
+                    entry => entry.Key,
+                    entry => new PropRow
+                    {
+                        Label = entry.Value.Label,
+                        Prompt = entry.Value.Prompt,
+                        Type = entry.Value.Type,
+                        Format = entry.Value.Format,
+                        Value = entry.Value.Value
+                    });
+            }
+
+            var rowElements = element?
+                .Elements(ns + "Section")
+                .FirstOrDefault(s => (string)s.Attribute("N") == "Property")
+                ?.Elements(ns + "Row");
+
+            if (rowElements == null || !rowElements.Any())
+                return masterPropRows;
+
+            foreach (var rowElement in rowElements)
+            {
+                string rowName = (string)rowElement.Attribute("N");
+
+                if ((string)rowElement.Attribute("Del") == "1")
+                {
+                    if (propRows.ContainsKey(rowName))
+                    {
+                        propRows.Remove(rowName);
+                    }
+                    continue;
+                }
+
+                string label = (string)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Label")
+                    ?.Attribute("V");
+                string prompt = (string)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Prompt")
+                    ?.Attribute("V");
+                int? type = (int?)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Type")
+                    ?.Attribute("V");
+                string format = (string)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Format")
+                    ?.Attribute("V");
+                string value = (string)rowElement.Elements(ns + "Cell")
+                    .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
+                    ?.Attribute("V");
+                
+
+                if (!propRows.ContainsKey(rowName))
+                {
+                    propRows[rowName] = new PropRow
+                    {
+                        Label = label,
+                        Prompt = prompt,
+                        Type = type,
+                        Format = format,
+                        Value = value
+                    };
+                    continue;
+                }
+                if (label != null) propRows[rowName].Label = label;
+                if (prompt != null) propRows[rowName].Prompt = prompt;
+                if (type != null) propRows[rowName].Type = type;
+                if (format != null) propRows[rowName].Format = format;
+                if (value != null) propRows[rowName].Value = value;
+            }
+
+            return propRows;
         }
 
         public static List<PackagePart> GetPackageParts(Package filePackage, string relationshipType)
