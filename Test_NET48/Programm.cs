@@ -30,6 +30,7 @@ namespace Test_NET48
                 Task.Run(() =>
                 {
                     var vp3 = new VisioParser();
+                    vp3.InheritFromMasters = false;
                     vp3.ParseVsdx(@"C:\Temp\vsdx\vsdx1.vsdx");
                     vp3.ExportJson(@"C:\Temp\vsdx\vsdx1.json");
                 }),

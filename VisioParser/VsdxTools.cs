@@ -366,7 +366,7 @@ namespace Geradeaus.Visio
                 string value = (string)rowElement.Elements(ns + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
                     ?.Attribute("V");
-                
+
 
                 if (!propRows.ContainsKey(rowName))
                 {

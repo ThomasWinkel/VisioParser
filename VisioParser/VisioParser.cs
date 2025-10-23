@@ -11,7 +11,7 @@ namespace Geradeaus.Visio
     public class VisioParser
     {
         public VisioModel VisioModel { get; set; }
-
+        public bool InheritFromMasters { get; set; } = true;
         public VisioParser() { }
 
         public void ParseVsdx(string vsdxPath)
@@ -62,7 +62,14 @@ namespace Geradeaus.Visio
             VisioModel.Document.UserRows = VsdxTools.ParseUserSection(documentSheetElement);
             VisioModel.Document.PropRows = VsdxTools.ParsePropertySection(documentSheetElement);
             VisioModel.Document.Masters = VsdxTools.ParseMasters(package, documentPart);
-            VisioModel.Document.Pages = VsdxTools.ParsePages(package, documentPart, VisioModel.Document.Masters);
+            if (InheritFromMasters)
+            {
+                VisioModel.Document.Pages = VsdxTools.ParsePages(package, documentPart, VisioModel.Document.Masters);
+            }
+            else
+            {
+                VisioModel.Document.Pages = VsdxTools.ParsePages(package, documentPart, null);
+            }
         }
     }
 }
