@@ -9,21 +9,18 @@ namespace Geradeaus.Visio
 {
     public static class VsdxTools
     {
-        public static readonly XNamespace ns = "http://schemas.microsoft.com/office/visio/2012/main";
-        public static readonly XNamespace rNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-
         public static Dictionary<int, Master> ParseMasters(Package package, PackagePart documentPart)
         {
             Dictionary<int, Master> masters = new Dictionary<int, Master>();
-            PackagePart mastersPart = GetPackageParts(package, documentPart, RelationshipTypes.Masters).ElementAtOrDefault(0);
+            PackagePart mastersPart = GetPackageParts(package, documentPart, Relationships.Masters).ElementAtOrDefault(0);
             if (mastersPart == null) return masters;
 
             XDocument mastersDocument = GetXMLFromPart(mastersPart);
-            var masterElements = mastersDocument.Root.Elements(ns + "Master");
+            var masterElements = mastersDocument.Root.Elements(Namespaces.Main + "Master");
 
             foreach (var masterElement in masterElements)
             {
-                string relId = masterElement.Element(ns + "Rel")?.Attribute(rNs + "id")?.Value;
+                string relId = masterElement.Element(Namespaces.Main + "Rel")?.Attribute(Namespaces.R + "id")?.Value;
                 if (string.IsNullOrEmpty(relId)) continue;
                 PackageRelationship masterRelationship = mastersPart.GetRelationship(relId);
                 Uri pageUri = PackUriHelper.ResolvePartUri(mastersPart.Uri, masterRelationship.TargetUri);
@@ -38,14 +35,14 @@ namespace Geradeaus.Visio
         public static Master ParseMaster(PackagePart masterPart, XElement masterElement)
         {
             XDocument masterDocument = GetXMLFromPart(masterPart);
-            var shapeElement = masterDocument.Root.Element(ns + "Shapes")?.Element(ns + "Shape");
+            var shapeElement = masterDocument.Root.Element(Namespaces.Main + "Shapes")?.Element(Namespaces.Main + "Shape");
 
             return new Master
             {
                 Id = int.Parse(masterElement.Attribute("ID")?.Value),
                 Name = masterElement.Attribute("Name")?.Value,
                 NameU = masterElement.Attribute("NameU")?.Value,
-                Text = masterElement.Element(ns + "Text")?.Value,
+                Text = masterElement.Element(Namespaces.Main + "Text")?.Value,
                 UserRows = ParseUserSection(shapeElement),
                 PropRows = ParsePropertySection(shapeElement)
             };
@@ -54,15 +51,15 @@ namespace Geradeaus.Visio
         public static Dictionary<int, Page> ParsePages(Package package, PackagePart documentPart, Dictionary<int, Master> masters)
         {
             Dictionary<int, Page> pages = new Dictionary<int, Page>();
-            PackagePart pagesPart = GetPackageParts(package, documentPart, RelationshipTypes.Pages).ElementAtOrDefault(0);
+            PackagePart pagesPart = GetPackageParts(package, documentPart, Relationships.Pages).ElementAtOrDefault(0);
             if (pagesPart == null) return pages;
 
             XDocument pagesDocument = GetXMLFromPart(pagesPart);
-            var pageElements = pagesDocument.Root.Elements(ns + "Page");
+            var pageElements = pagesDocument.Root.Elements(Namespaces.Main + "Page");
 
             foreach (var pageElement in pageElements)
             {
-                string relId = pageElement.Element(ns + "Rel")?.Attribute(rNs + "id")?.Value;
+                string relId = pageElement.Element(Namespaces.Main + "Rel")?.Attribute(Namespaces.R + "id")?.Value;
                 if (string.IsNullOrEmpty(relId)) continue;
                 PackageRelationship pageRelationship = pagesPart.GetRelationship(relId);
                 Uri pageUri = PackUriHelper.ResolvePartUri(pagesPart.Uri, pageRelationship.TargetUri);
@@ -81,13 +78,13 @@ namespace Geradeaus.Visio
             page.NameU = pageElement.Attribute("NameU")?.Value;
             page.Name = pageElement.Attribute("Name")?.Value;
 
-            var pageSheetElement = pageElement.Element(ns + "PageSheet");
+            var pageSheetElement = pageElement.Element(Namespaces.Main + "PageSheet");
             page.UserRows = ParseUserSection(pageSheetElement);
             page.PropRows = ParsePropertySection(pageSheetElement);
             page.Layers = ParseLayerSection(pageSheetElement);
 
             XDocument pageDocument = GetXMLFromPart(pagePart);
-            var shapeElements = pageDocument.Root.Element(ns + "Shapes")?.Elements(ns + "Shape") ?? Enumerable.Empty<XElement>();
+            var shapeElements = pageDocument.Root.Element(Namespaces.Main + "Shapes")?.Elements(Namespaces.Main + "Shape") ?? Enumerable.Empty<XElement>();
 
             if (shapeElements.Any()) page.Shapes = new Dictionary<int, Shape>();
 
@@ -110,7 +107,7 @@ namespace Geradeaus.Visio
                 Name = shapeElement.Attribute("Name")?.Value,
                 NameU = shapeElement.Attribute("NameU")?.Value,
                 NameId = shapeElement.Attribute("NameID")?.Value,
-                Text = shapeElement.Element(ns + "Text")?.Value,
+                Text = shapeElement.Element(Namespaces.Main + "Text")?.Value,
                 Master = (int?)shapeElement.Attribute("Master")
             };
 
@@ -129,7 +126,7 @@ namespace Geradeaus.Visio
 
         public static List<Connect> ParseConnects(XDocument pageDocument)
         {
-            return pageDocument?.Root.Element(ns + "Connects")?.Elements(ns + "Connect").Select(
+            return pageDocument?.Root.Element(Namespaces.Main + "Connects")?.Elements(Namespaces.Main + "Connect").Select(
                 con => new Connect
                 {
                     FromSheet = int.Parse((string)con.Attribute("FromSheet")),
@@ -144,43 +141,43 @@ namespace Geradeaus.Visio
         public static Dictionary<int, Layer> ParseLayerSection(XElement pageSheetElement)
         {
             return pageSheetElement?
-                .Elements(ns + "Section")
+                .Elements(Namespaces.Main + "Section")
                 .FirstOrDefault(s => (string)s.Attribute("N") == "Layer")
-                ?.Elements(ns + "Row")
+                ?.Elements(Namespaces.Main + "Row")
                 .Where(row => !string.IsNullOrEmpty((string)row.Attribute("IX")))
                 .ToDictionary(
                     row => int.Parse((string)row.Attribute("IX")),
                     row => new Layer
                     {
                         Index = int.Parse((string)row.Attribute("IX")),
-                        Name = (string)row.Elements(ns + "Cell")
+                        Name = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Name")
                             ?.Attribute("V"),
-                        NameU = (string)row.Elements(ns + "Cell")
+                        NameU = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "NameUniv")
                             ?.Attribute("V"),
-                        Visible = (string)row.Elements(ns + "Cell")
+                        Visible = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Visible")
                             ?.Attribute("V") == "1",
-                        Print = (string)row.Elements(ns + "Cell")
+                        Print = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Print")
                             ?.Attribute("V") == "1",
-                        Active = (string)row.Elements(ns + "Cell")
+                        Active = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Active")
                             ?.Attribute("V") == "1",
-                        Lock = (string)row.Elements(ns + "Cell")
+                        Lock = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Lock")
                             ?.Attribute("V") == "1",
-                        Snap = (string)row.Elements(ns + "Cell")
+                        Snap = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Snap")
                             ?.Attribute("V") == "1",
-                        Glue = (string)row.Elements(ns + "Cell")
+                        Glue = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Glue")
                             ?.Attribute("V") == "1",
-                        Color = int.Parse((string)row.Elements(ns + "Cell")
+                        Color = int.Parse((string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Color")
                             ?.Attribute("V")),
-                        ColorTrans = double.Parse((string)row.Elements(ns + "Cell")
+                        ColorTrans = double.Parse((string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "ColorTrans")
                             ?.Attribute("V"))
                     })
@@ -190,18 +187,18 @@ namespace Geradeaus.Visio
         public static Dictionary<string, UserRow> ParseUserSection(XElement element)
         {
             return element?
-                .Elements(ns + "Section")
+                .Elements(Namespaces.Main + "Section")
                 .FirstOrDefault(s => (string)s.Attribute("N") == "User")
-                ?.Elements(ns + "Row")
+                ?.Elements(Namespaces.Main + "Row")
                 .Where(row => !string.IsNullOrEmpty((string)row.Attribute("N")))
                 .ToDictionary(
                     row => (string)row.Attribute("N"),
                     row => new UserRow
                     {
-                        Value = (string)row.Elements(ns + "Cell")
+                        Value = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
                             ?.Attribute("V"),
-                        Prompt = (string)row.Elements(ns + "Cell")
+                        Prompt = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Prompt")
                             ?.Attribute("V")
                     })
@@ -228,9 +225,9 @@ namespace Geradeaus.Visio
             }
 
             var rowElements = element?
-                .Elements(ns + "Section")
+                .Elements(Namespaces.Main + "Section")
                 .FirstOrDefault(s => (string)s.Attribute("N") == "User")
-                ?.Elements(ns + "Row");
+                ?.Elements(Namespaces.Main + "Row");
 
             if (rowElements == null || !rowElements.Any())
                 return masterUserRows;
@@ -248,10 +245,10 @@ namespace Geradeaus.Visio
                     continue;
                 }
 
-                string value = (string)rowElement.Elements(ns + "Cell")
+                string value = (string)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
                     ?.Attribute("V");
-                string prompt = (string)rowElement.Elements(ns + "Cell")
+                string prompt = (string)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Prompt")
                     ?.Attribute("V");
 
@@ -281,27 +278,27 @@ namespace Geradeaus.Visio
         public static Dictionary<string, PropRow> ParsePropertySection(XElement element)
         {
             return element?
-                .Elements(ns + "Section")
+                .Elements(Namespaces.Main + "Section")
                 .FirstOrDefault(s => (string)s.Attribute("N") == "Property")
-                ?.Elements(ns + "Row")
+                ?.Elements(Namespaces.Main + "Row")
                 .Where(row => !string.IsNullOrEmpty((string)row.Attribute("N")))
                 .ToDictionary(
                     row => (string)row.Attribute("N"),
                     row => new PropRow
                     {
-                        Value = (string)row.Elements(ns + "Cell")
+                        Value = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
                             ?.Attribute("V"),
-                        Prompt = (string)row.Elements(ns + "Cell")
+                        Prompt = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Prompt")
                             ?.Attribute("V"),
-                        Label = (string)row.Elements(ns + "Cell")
+                        Label = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Label")
                             ?.Attribute("V"),
-                        Format = (string)row.Elements(ns + "Cell")
+                        Format = (string)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Format")
                             ?.Attribute("V"),
-                        Type = (int?)row.Elements(ns + "Cell")
+                        Type = (int?)row.Elements(Namespaces.Main + "Cell")
                             .FirstOrDefault(c => (string)c.Attribute("N") == "Type")
                             ?.Attribute("V")
                     })
@@ -331,9 +328,9 @@ namespace Geradeaus.Visio
             }
 
             var rowElements = element?
-                .Elements(ns + "Section")
+                .Elements(Namespaces.Main + "Section")
                 .FirstOrDefault(s => (string)s.Attribute("N") == "Property")
-                ?.Elements(ns + "Row");
+                ?.Elements(Namespaces.Main + "Row");
 
             if (rowElements == null || !rowElements.Any())
                 return masterPropRows;
@@ -351,19 +348,19 @@ namespace Geradeaus.Visio
                     continue;
                 }
 
-                string label = (string)rowElement.Elements(ns + "Cell")
+                string label = (string)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Label")
                     ?.Attribute("V");
-                string prompt = (string)rowElement.Elements(ns + "Cell")
+                string prompt = (string)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Prompt")
                     ?.Attribute("V");
-                int? type = (int?)rowElement.Elements(ns + "Cell")
+                int? type = (int?)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Type")
                     ?.Attribute("V");
-                string format = (string)rowElement.Elements(ns + "Cell")
+                string format = (string)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Format")
                     ?.Attribute("V");
-                string value = (string)rowElement.Elements(ns + "Cell")
+                string value = (string)rowElement.Elements(Namespaces.Main + "Cell")
                     .FirstOrDefault(c => (string)c.Attribute("N") == "Value")
                     ?.Attribute("V");
 
@@ -423,14 +420,32 @@ namespace Geradeaus.Visio
                 return XDocument.Load(partStream);
             }
         }
-    }
 
-    public class RelationshipTypes
-    {
-        public const string Document = "http://schemas.microsoft.com/visio/2010/relationships/document";
-        public const string Masters = "http://schemas.microsoft.com/visio/2010/relationships/masters";
-        public const string Master = "http://schemas.microsoft.com/visio/2010/relationships/master";
-        public const string Pages = "http://schemas.microsoft.com/visio/2010/relationships/pages";
-        public const string Page = "http://schemas.microsoft.com/visio/2010/relationships/page";
+        public static void GetDocumentProperties(Package package, Document document)
+        {
+            PackagePart corePropertiesPart = GetPackageParts(package, Relationships.CoreProperties).ElementAtOrDefault(0);
+            if (corePropertiesPart != null)
+            {
+                XDocument corePropertiesDocument = GetXMLFromPart(corePropertiesPart);
+                document.Title = corePropertiesDocument.Root.Element(Namespaces.Dc + "title")?.Value;
+                document.Subject = corePropertiesDocument.Root.Element(Namespaces.Dc + "subject")?.Value;
+                document.Description = corePropertiesDocument.Root.Element(Namespaces.Dc + "description")?.Value;
+                document.Creator = corePropertiesDocument.Root.Element(Namespaces.Dc + "creator")?.Value;
+                document.Category = corePropertiesDocument.Root.Element(Namespaces.Cp + "category")?.Value;
+                document.Keywords = corePropertiesDocument.Root.Element(Namespaces.Cp + "keywords")?.Value;
+                document.Language = corePropertiesDocument.Root.Element(Namespaces.Dc + "language")?.Value;
+                document.TimeCreated = corePropertiesDocument.Root.Element(Namespaces.Dcterms + "created")?.Value;
+                document.TimeEdited = corePropertiesDocument.Root.Element(Namespaces.Dcterms + "modified")?.Value;
+            }
+            
+            PackagePart extendedPropertiesPart = GetPackageParts(package, Relationships.ExtendedProperties).ElementAtOrDefault(0);
+            if (extendedPropertiesPart != null)
+            {
+                XDocument extendedPropertiesDocument = GetXMLFromPart(extendedPropertiesPart);
+                document.Manager = extendedPropertiesDocument.Root.Element(Namespaces.Ep + "Manager")?.Value;
+                document.Company = extendedPropertiesDocument.Root.Element(Namespaces.Ep + "Company")?.Value;
+                document.AppVersion = extendedPropertiesDocument.Root.Element(Namespaces.Ep + "AppVersion")?.Value;
+            }
+        }
     }
 }

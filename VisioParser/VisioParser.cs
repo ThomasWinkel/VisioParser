@@ -23,6 +23,11 @@ namespace Geradeaus.Visio
                     ParseDocument(package);
                 }
             }
+
+            if (VisioModel != null)
+            {
+                VisioModel.Document.Name = Path.GetFileName(vsdxPath);
+            }
         }
 
         public void ExportJson(string jsonPath)
@@ -49,16 +54,17 @@ namespace Geradeaus.Visio
         {
             VisioModel = null;
 
-            PackagePart documentPart = VsdxTools.GetPackageParts(package, RelationshipTypes.Document).ElementAtOrDefault(0);
+            PackagePart documentPart = VsdxTools.GetPackageParts(package, Relationships.Document).ElementAtOrDefault(0);
             if (documentPart == null) return;
 
             XDocument document = VsdxTools.GetXMLFromPart(documentPart);
-            var documentSheetElement = document.Root.Element(VsdxTools.ns + "DocumentSheet");
+            var documentSheetElement = document.Root.Element(Namespaces.Main + "DocumentSheet");
             if (documentSheetElement == null) return;
 
             VisioModel = new VisioModel();
             VisioModel.Metadata.ExportTime = DateTime.UtcNow;
             VisioModel.Metadata.VisioParserVersion = Assembly.GetEntryAssembly().GetName().Version.ToString();
+            VsdxTools.GetDocumentProperties(package, VisioModel.Document);
             VisioModel.Document.UserRows = VsdxTools.ParseUserSection(documentSheetElement);
             VisioModel.Document.PropRows = VsdxTools.ParsePropertySection(documentSheetElement);
             VisioModel.Document.Masters = VsdxTools.ParseMasters(package, documentPart);

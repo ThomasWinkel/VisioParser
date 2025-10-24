@@ -96,8 +96,6 @@ namespace Geradeaus.Visio
     public class Document
     {
         public string Name { get; set; }
-        public string FullName { get; set; }
-        public string Path { get; set; }
         public string Title { get; set; }
         public string Subject { get; set; }
         public string Description { get; set; }
@@ -109,7 +107,7 @@ namespace Geradeaus.Visio
         public string Language { get; set; }
         public string TimeCreated { get; set; }
         public string TimeEdited { get; set; }
-        public string TimeSaved { get; set; }
+        public string AppVersion { get; set; }
         public Dictionary<string, UserRow> UserRows { get; set; }
         public Dictionary<string, PropRow> PropRows { get; set; }
         public Dictionary<int, Master> Masters { get; set; }
